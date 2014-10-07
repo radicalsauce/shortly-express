@@ -10,8 +10,13 @@ var User = require('./app/models/user');
 var Links = require('./app/collections/links');
 var Link = require('./app/models/link');
 var Click = require('./app/models/click');
+var cP = require('cookie-parser');
+var session = require('express-session');
 
 var app = express();
+
+app.use(cP());
+app.use(session({secret: '123'}));
 
 app.set('views', __dirname + '/views');
 app.set('view engine', 'ejs');
@@ -23,24 +28,68 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/public'));
 
 
-app.get('/', 
+app.get('/login',
 function(req, res) {
-  res.render('index');
+  res.render('login');
 });
 
-app.get('/create', 
+app.get('/signup',
 function(req, res) {
-  res.render('index');
+  res.render('signup');
 });
 
-app.get('/links', 
+app.get('/',
+function(req, res) {
+  // util.logUser();
+  // console.log(req.session);
+  if(!req.session.user){
+    res.redirect(301, 'login');
+  } else {
+    res.render('index');
+  }
+});
+
+app.get('/create',
+function(req, res) {
+  if(!req.session.user){
+    res.redirect(301, 'login');
+  } else {
+    res.render('index');
+  }
+});
+
+app.get('/links',
 function(req, res) {
   Links.reset().fetch().then(function(links) {
-    res.send(200, links.models);
+    if(!req.session.user){
+      res.redirect(301, 'login');
+    } else {
+      res.send(200, links.models);
+    }
   });
 });
 
-app.post('/links', 
+app.post('/signup',
+function(req, res) {
+  var userData = req.body;
+  console.log(userData, "USERDATA");
+
+  new User({username: userData.username, password: userData.password}).fetch().then(function(found) {
+    if (found) {
+      // then logged in
+      res.send(200, found.attributes);
+    } else {
+      var user = new User({username: userData.username, password: userData.password});
+      user.save().then(function(newUser){
+        console.log("YES!!!!!!");
+        User.add(newUser);
+        res.send(200, newUser);
+      });
+    }
+  });
+});
+
+app.post('/links',
 function(req, res) {
   var uri = req.body.url;
 
@@ -58,7 +107,6 @@ function(req, res) {
           console.log('Error reading URL heading: ', err);
           return res.send(404);
         }
-
         var link = new Link({
           url: uri,
           title: title,
