@@ -54,7 +54,8 @@ function(req, res) {
   if(!req.session.user){
     res.redirect(301, 'login');
   } else {
-    res.render('index');
+    console.log(req.session.user);
+    res.render('create');
   }
 });
 
@@ -69,21 +70,37 @@ function(req, res) {
   });
 });
 
-app.post('/signup',
+app.post('/login',
 function(req, res) {
   var userData = req.body;
-  console.log(userData, "USERDATA");
 
   new User({username: userData.username, password: userData.password}).fetch().then(function(found) {
     if (found) {
-      // then logged in
-      res.send(200, found.attributes);
+      req.session.regenerate(function(){
+        req.session.user = userData.username;
+        res.redirect(301,'/');
+      });
+    } else {
+      res.redirect(301, '/login');
+    }
+  });
+});
+
+app.post('/signup',
+function(req, res) {
+  var userData = req.body;
+
+  new User({username: userData.username, password: userData.password}).fetch().then(function(found) {
+    if (found) {
+      req.session.regenerate(function(){
+        req.session.user = userData.username;
+        res.redirect(301,'login');
+      });
     } else {
       var user = new User({username: userData.username, password: userData.password});
       user.save().then(function(newUser){
-        console.log("YES!!!!!!");
-        User.add(newUser);
-        res.send(200, newUser);
+        Users.add(newUser);
+        res.redirect(301, '/');
       });
     }
   });
