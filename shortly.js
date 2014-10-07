@@ -40,8 +40,6 @@ function(req, res) {
 
 app.get('/',
 function(req, res) {
-  // util.logUser();
-  // console.log(req.session);
   if(!req.session.user){
     res.redirect(301, 'login');
   } else {
@@ -60,7 +58,6 @@ function(req, res) {
   if(!req.session.user){
     res.redirect(301, 'login');
   } else {
-    console.log(req.session.user);
     res.render('create');
   }
 });
@@ -68,22 +65,42 @@ function(req, res) {
 app.get('/links',
 function(req, res) {
   Links.reset().fetch().then(function(links) {
+    var userName = req.session.user;
+    console.log(req.session.cUserId, 'CURRENT USERS ID');
+
     if(!req.session.user){
       res.redirect(301, 'login');
     } else {
-      res.send(200, links.models);
+      var models = links.models.filter(function(model){
+        console.log(model.get('user_id'), 'LINK USER ID');
+        return model.get('user_id') === req.session.cUserId;
+      });
+
+      console.log('MODELS FILTERED', models);
+      res.send(200, models);
     }
   });
 });
 
 app.post('/login',
 function(req, res) {
-  var userData = req.body;
+  var userName = req.body.username;
+  var password = req.body.password;
+  var hashedPassword = null;
+  var passCorrect = null;
+  var id = null;
 
-  new User({username: userData.username, password: userData.password}).fetch().then(function(found) {
-    if (found) {
+  new User({username: userName}).fetch()
+  .then(function(model){
+    hashedPassword = model.get('password');
+    id = model.get('id');
+    passCorrect = util.hashCompare(password, hashedPassword);
+  })
+  .then(function() {
+    if (passCorrect) {
       req.session.regenerate(function(){
-        req.session.user = userData.username;
+        req.session.user = userName;
+        req.session.cUserId = id;
         res.redirect(301,'/');
       });
     } else {
@@ -94,16 +111,14 @@ function(req, res) {
 
 app.post('/signup',
 function(req, res) {
-  var userData = req.body;
-
-  new User({username: userData.username, password: userData.password}).fetch().then(function(found) {
+  var userName = req.body.username;
+  var password = req.body.password;
+  var hashedPassword = util.passwordHash(password);
+  new User({username: userName, password: hashedPassword}).fetch().then(function(found) {
     if (found) {
-      req.session.regenerate(function(){
-        req.session.user = userData.username;
-        res.redirect(301,'login');
-      });
+      res.redirect(301,'login');
     } else {
-      var user = new User({username: userData.username, password: userData.password});
+      var user = new User({username: userName, password: hashedPassword});
       user.save().then(function(newUser){
         Users.add(newUser);
         res.redirect(301, '/');
@@ -125,21 +140,27 @@ function(req, res) {
     if (found) {
       res.send(200, found.attributes);
     } else {
-      util.getUrlTitle(uri, function(err, title) {
-        if (err) {
-          console.log('Error reading URL heading: ', err);
-          return res.send(404);
+      var userName = req.session.user;
+      new User({username: userName}).fetch()
+      .then(function(model) {
+        if (model) {
+          var id = model.get('id');
+          util.getUrlTitle(uri, function(err, title) {
+            if (err) {
+              return res.send(404);
+            }
+            var link = new Link({
+              url: uri,
+              title: title,
+              base_url: req.headers.origin,
+              user_id: id
+            });
+            link.save().then(function(newLink) {
+              Links.add(newLink);
+              res.send(200, newLink);
+            });
+          });
         }
-        var link = new Link({
-          url: uri,
-          title: title,
-          base_url: req.headers.origin
-        });
-
-        link.save().then(function(newLink) {
-          Links.add(newLink);
-          res.send(200, newLink);
-        });
       });
     }
   });

@@ -195,7 +195,7 @@ describe('', function() {
         });
       });
 
-      xit('Returns all of the links to display on the links page', function(done) {
+      it('Returns all of the links to display on the links page', function(done) {
         var options = {
           'method': 'GET',
           'uri': 'http://127.0.0.1:4568/links'
@@ -250,11 +250,9 @@ describe('', function() {
       };
 
       request(options, function(error, res, body) {
-        console.log(error, "ERROR !!!!!!!!!!!!!!!!!!!!");
         db.knex('users')
           .where('username', '=', 'Svnh')
           .then(function(res) {
-            console.log(res, "RESULT IN TEST");
             if (res[0] && res[0]['username']) {
               var user = res[0]['username'];
             }
